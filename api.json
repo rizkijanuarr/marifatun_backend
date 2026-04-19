@@ -1,0 +1,1428 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Marifatun API Documentation",
+        "version": "1.0.0",
+        "description": "## Overview\n\nMarifatun API adalah layanan backend untuk platform copywriting berbasis LLM.\nSatu brief, lima format siap posting: **LinkedIn**, **X (Twitter)**, **Threads**,\n**Facebook**, dan **Email Marketing**. API ini menyediakan otentikasi, manajemen\nuser, saldo kredit, top-up via QRIS, dan generator konten otomatis.\n\n## Description\n\nPlatform dirancang untuk UMKM, digital marketer, dan content creator yang butuh\nmembuat konten multi-channel secara konsisten tanpa harus menulis dari nol. Tiap\ngenerate konten mengonsumsi 1 kredit; revisi konten tidak memotong kredit dan\ndibatasi 3x per konten. Kredit dapat ditambah melalui permintaan top-up yang\ndisetujui admin.\n\n## Role\n\n- `ADMIN` \u2014 akses penuh: manajemen user, kredit, seluruh konten, approval\n  top-up, dan dashboard admin.\n- `MARIFATUN_USER` \u2014 user aplikasi: generate & revisi konten sendiri, melihat\n  saldo kredit sendiri, mengajukan top-up, dan dashboard user.\n\n## Core Bisnis\n\n1. **Auth** \u2014 registrasi, login, logout, dan reset password (Sanctum Bearer token).\n2. **User Credit** \u2014 setiap user punya saldo kredit; kredit dipotong saat generate\n   konten baru, tidak dipotong untuk revisi.\n3. **Content** \u2014 generator copywriting lintas platform berbasis LLM. Revisi\n   maksimum 3x per konten.\n4. **Topup Request** \u2014 user mengajukan top-up (default via QRIS), admin melakukan\n   approval; saldo bertambah otomatis begitu disetujui.\n5. **Dashboard** \u2014 ringkasan metrik untuk admin (agregat global) dan user\n   (saldo, history top-up, konten terbaru).\n\n## API Base URL\n\n```\n{APP_URL}/api/v1\n```\n\nContoh: `http://127.0.0.1:8000/api/v1`. Semua endpoint versi pertama\nberada di bawah prefix `/api/v1`."
+    },
+    "servers": [
+        {
+            "url": "http://localhost/api"
+        }
+    ],
+    "security": [
+        {
+            "http": []
+        }
+    ],
+    "paths": {
+        "/v1/auth/register": {
+            "post": {
+                "operationId": "auth.register",
+                "description": "Registrasi pengguna baru. Secara default user baru mendapatkan role `MARIFATUN_USER`\ndan saldo 1 kredit gratis.\n\n**Akses:** Public (tanpa token)\n\n**Role yang dihasilkan:** `MARIFATUN_USER`",
+                "summary": "Register",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/v1/auth/login": {
+            "post": {
+                "operationId": "auth.login",
+                "description": "Login pengguna menggunakan email & password. Mengembalikan Bearer token (Sanctum)\nyang wajib dikirim pada header `Authorization: Bearer {token}` untuk endpoint\nyang memerlukan otentikasi.\n\n**Akses:** Public (tanpa token)\n\n**Role yang bisa login:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "Login",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/v1/auth/forgot-password": {
+            "post": {
+                "operationId": "auth.forgotPassword",
+                "description": "Reset password user. Client mengirim `email` dan `new_password`. Jika email\nterdaftar, password user akan di-update dengan `new_password` yang diberikan.\nJika email tidak terdaftar, akan dikembalikan error validasi.\n\n**Akses:** Public (tanpa token)\n\n**Role yang bisa pakai:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "Forgot Password",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ForgotPasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/v1/auth/logout": {
+            "post": {
+                "operationId": "auth.logout",
+                "description": "Menghapus Bearer token yang sedang dipakai user saat ini (Sanctum\n`currentAccessToken`). Setelah logout, token tersebut tidak dapat dipakai\nlagi untuk request berikutnya.\n\nPada halaman dokumentasi, sistem juga akan otomatis menghapus token yang\ntersimpan di `localStorage` sehingga endpoint lain tidak lagi terisi token.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "Logout",
+                "tags": [
+                    "Auth"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/contents": {
+            "get": {
+                "operationId": "contents.index",
+                "description": "Menampilkan daftar konten (paginated). `MARIFATUN_USER` hanya melihat kontennya\nsendiri, sedangkan `ADMIN` dapat melihat seluruh konten (bisa difilter via `user_id`).\nMendukung filter `content_type` dan `search`.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "List Contents",
+                "tags": [
+                    "Content"
+                ],
+                "parameters": [
+                    {
+                        "name": "content_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "contents.store",
+                "description": "Membuat konten baru. Sistem akan memanggil LLM (OpenRouter) untuk menghasilkan\n`result` dan mengonsumsi 1 kredit dari saldo user. Jika saldo 0, request akan ditolak.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "Create Content",
+                "tags": [
+                    "Content"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateContentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/contents/{content}": {
+            "get": {
+                "operationId": "contents.show",
+                "description": "Detail konten berdasarkan UUID. `MARIFATUN_USER` hanya bisa melihat konten\nmiliknya sendiri (akses lain dibalas `403 Forbidden`).\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER` (hanya konten miliknya)",
+                "summary": "Show Content",
+                "tags": [
+                    "Content"
+                ],
+                "parameters": [
+                    {
+                        "name": "content",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "contents.update",
+                "description": "Merevisi konten yang sudah ada. Client mengirim body dengan field yang\nsama seperti Create Content (`content_type`, `topic`, `keywords`,\n`target_audience`, `tone`). Sistem akan memanggil LLM ulang untuk\nmenghasilkan `result` versi baru.\n\n**Aturan:**\n- Revisi **tidak** mengonsumsi kredit.\n- Dibatasi maksimum **3x revisi per konten**. Revisi ke-4 akan ditolak\n  dengan `422` dan pesan \"Batas revisi untuk konten ini telah tercapai\".\n- Counter `revision_count` di response akan bertambah setiap revisi sukses.\n\n`MARIFATUN_USER` hanya bisa merevisi konten miliknya sendiri.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER` (hanya konten miliknya)",
+                "summary": "Update Content (Revisi)",
+                "tags": [
+                    "Content"
+                ],
+                "parameters": [
+                    {
+                        "name": "content",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateContentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "contents.destroy",
+                "description": "Soft delete konten. `MARIFATUN_USER` hanya bisa menghapus konten miliknya sendiri.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER` (hanya konten miliknya)",
+                "summary": "Delete Content",
+                "tags": [
+                    "Content"
+                ],
+                "parameters": [
+                    {
+                        "name": "content",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/dashboard/admin": {
+            "get": {
+                "operationId": "dashboard.admin",
+                "description": "Ringkasan data global: total user, total konten, total topup pending, total\nkredit beredar, daftar topup terbaru, dan konten terbaru.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Admin Dashboard Summary",
+                "tags": [
+                    "Dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/dashboard/user": {
+            "get": {
+                "operationId": "dashboard.user",
+                "description": "Ringkasan untuk user yang sedang login: sisa kredit, status klaim harian,\nhistory topup, dan konten terbaru.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `MARIFATUN_USER`",
+                "summary": "User Dashboard Summary",
+                "tags": [
+                    "Dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/topup-requests": {
+            "get": {
+                "operationId": "topupRequest.index",
+                "description": "Menampilkan daftar permintaan topup (paginated). `MARIFATUN_USER` hanya melihat\nrequest miliknya sendiri, `ADMIN` dapat melihat semua (bisa difilter via `user_id`).\nMendukung filter `status` (`pending`, `approved`, `rejected`).\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "List Topup Requests",
+                "tags": [
+                    "TopupRequest"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "topupRequest.store",
+                "description": "Membuat permintaan topup kredit. Status awal `pending` menunggu approval admin.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "Create Topup Request",
+                "tags": [
+                    "TopupRequest"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateTopupRequestRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/topup-requests/{topupRequest}": {
+            "get": {
+                "operationId": "topupRequest.show",
+                "description": "Detail permintaan topup. `MARIFATUN_USER` hanya bisa melihat request miliknya.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER` (hanya request miliknya)",
+                "summary": "Show Topup Request",
+                "tags": [
+                    "TopupRequest"
+                ],
+                "parameters": [
+                    {
+                        "name": "topupRequest",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "v1.topupRequest.update_1",
+                "description": "Update status topup request. Jika status diubah menjadi `approved`, sistem akan\notomatis menambahkan `credits` ke saldo user dan mencatat `approved_by` +\n`approved_at`.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Update / Approve Topup Request",
+                "tags": [
+                    "TopupRequest"
+                ],
+                "parameters": [
+                    {
+                        "name": "topupRequest",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateTopupRequestRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "v1.topupRequest.update_2",
+                "description": "Update status topup request. Jika status diubah menjadi `approved`, sistem akan\notomatis menambahkan `credits` ke saldo user dan mencatat `approved_by` +\n`approved_at`.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Update / Approve Topup Request",
+                "tags": [
+                    "TopupRequest"
+                ],
+                "parameters": [
+                    {
+                        "name": "topupRequest",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateTopupRequestRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "topupRequest.destroy",
+                "description": "Soft delete topup request.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Delete Topup Request",
+                "tags": [
+                    "TopupRequest"
+                ],
+                "parameters": [
+                    {
+                        "name": "topupRequest",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/users": {
+            "get": {
+                "operationId": "users.index",
+                "description": "Menampilkan daftar users (paginated). Mendukung filter `search` (name/email)\ndan `active`, serta parameter `per_page`.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "List Users",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "active",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "users.store",
+                "description": "Membuat user baru. Admin bisa menentukan `role` (default: `MARIFATUN_USER`).\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Create User",
+                "tags": [
+                    "User"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateUserRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/users/{user}": {
+            "get": {
+                "operationId": "users.show",
+                "description": "Detail user berdasarkan UUID.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Show User",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "users.update",
+                "description": "Update data user (nama, email, password, role, status aktif).\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Update User",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateUserRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "users.destroy",
+                "description": "Soft delete user.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Delete User",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/user-credits": {
+            "post": {
+                "operationId": "user-credits.store",
+                "description": "Menambahkan record kredit untuk user tertentu.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Create User Credit",
+                "tags": [
+                    "UserCredit"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateUserCreditRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "get": {
+                "operationId": "userCredit.index",
+                "description": "Menampilkan daftar saldo kredit (paginated).\n\n- `ADMIN` dapat melihat kredit seluruh user (opsional difilter via\n  query `user_id`).\n- `MARIFATUN_USER` hanya dapat melihat kreditnya sendiri (filter\n  `user_id` diabaikan / dipaksa ke user yang sedang login).\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`, `MARIFATUN_USER`",
+                "summary": "List User Credits",
+                "tags": [
+                    "UserCredit"
+                ],
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/user-credits/{userCredit}": {
+            "get": {
+                "operationId": "user-credits.show",
+                "description": "Detail kredit user berdasarkan UUID.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Show User Credit",
+                "tags": [
+                    "UserCredit"
+                ],
+                "parameters": [
+                    {
+                        "name": "userCredit",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "user-credits.update",
+                "description": "Update nominal kredit atau tanggal klaim harian user.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Update User Credit",
+                "tags": [
+                    "UserCredit"
+                ],
+                "parameters": [
+                    {
+                        "name": "userCredit",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateUserCreditRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "user-credits.destroy",
+                "description": "Soft delete record kredit user.\n\n**Akses:** Memerlukan Bearer token.\n\n**Role:** `ADMIN`",
+                "summary": "Delete User Credit",
+                "tags": [
+                    "UserCredit"
+                ],
+                "parameters": [
+                    {
+                        "name": "userCredit",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "http": {
+                "type": "http",
+                "description": "Masukkan Bearer token dari response `POST /api/v1/auth/login`. Format: `Bearer {token}`.",
+                "scheme": "bearer"
+            }
+        },
+        "schemas": {
+            "CreateContentRequest": {
+                "type": "object",
+                "properties": {
+                    "content_type": {
+                        "type": "string",
+                        "enum": [
+                            "linkedin",
+                            "x",
+                            "thread",
+                            "facebook",
+                            "email_marketing"
+                        ]
+                    },
+                    "topic": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "keywords": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 1000
+                    },
+                    "target_audience": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "formal",
+                            "casual",
+                            "persuasive",
+                            "friendly",
+                            "professional",
+                            "inspirational",
+                            "humorous"
+                        ]
+                    }
+                },
+                "required": [
+                    "content_type",
+                    "topic",
+                    "tone"
+                ],
+                "title": "CreateContentRequest"
+            },
+            "CreateTopupRequestRequest": {
+                "type": "object",
+                "properties": {
+                    "amount": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "minimum": 1
+                    },
+                    "credits": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    },
+                    "payment_method": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "qris"
+                        ]
+                    },
+                    "payment_proof": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    }
+                },
+                "title": "CreateTopupRequestRequest"
+            },
+            "CreateUserCreditRequest": {
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "credits": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "last_daily_claim": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "user_id",
+                    "credits"
+                ],
+                "title": "CreateUserCreditRequest"
+            },
+            "CreateUserRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 6
+                    },
+                    "role": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "ADMIN",
+                            "MARIFATUN_USER"
+                        ]
+                    },
+                    "active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "name",
+                    "email",
+                    "password"
+                ],
+                "title": "CreateUserRequest"
+            },
+            "ForgotPasswordRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "new_password": {
+                        "type": "string",
+                        "minLength": 6
+                    }
+                },
+                "required": [
+                    "email",
+                    "new_password"
+                ],
+                "title": "ForgotPasswordRequest"
+            },
+            "LoginRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 6
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "LoginRequest"
+            },
+            "RegisterRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 6
+                    },
+                    "password_confirmation": {
+                        "type": "string",
+                        "minLength": 6
+                    }
+                },
+                "required": [
+                    "name",
+                    "email",
+                    "password",
+                    "password_confirmation"
+                ],
+                "title": "RegisterRequest"
+            },
+            "UpdateContentRequest": {
+                "type": "object",
+                "properties": {
+                    "content_type": {
+                        "type": "string",
+                        "enum": [
+                            "linkedin",
+                            "x",
+                            "thread",
+                            "facebook",
+                            "email_marketing"
+                        ]
+                    },
+                    "topic": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "keywords": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 1000
+                    },
+                    "target_audience": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "formal",
+                            "casual",
+                            "persuasive",
+                            "friendly",
+                            "professional",
+                            "inspirational",
+                            "humorous"
+                        ]
+                    }
+                },
+                "required": [
+                    "content_type",
+                    "topic",
+                    "tone"
+                ],
+                "title": "UpdateContentRequest"
+            },
+            "UpdateTopupRequestRequest": {
+                "type": "object",
+                "properties": {
+                    "amount": {
+                        "type": "number",
+                        "minimum": 1
+                    },
+                    "credits": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "payment_method": {
+                        "type": "string",
+                        "enum": [
+                            "qris"
+                        ]
+                    },
+                    "payment_proof": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "approved",
+                            "rejected"
+                        ]
+                    },
+                    "active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateTopupRequestRequest"
+            },
+            "UpdateUserCreditRequest": {
+                "type": "object",
+                "properties": {
+                    "credits": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "last_daily_claim": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateUserCreditRequest"
+            },
+            "UpdateUserRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 6
+                    },
+                    "role": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "ADMIN",
+                            "MARIFATUN_USER"
+                        ]
+                    },
+                    "active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateUserRequest"
+            }
+        },
+        "responses": {
+            "ValidationException": {
+                "description": "Validation error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Errors overview."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "description": "A detailed description of each field that failed validation.",
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "message",
+                                "errors"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthenticationException": {
+                "description": "Unauthenticated",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
