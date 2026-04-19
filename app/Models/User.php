@@ -4,24 +4,25 @@ namespace App\Models;
 
 use App\Traits\HasAuditFields;
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable, SoftDeletes, HasRoles, HasUuid, HasAuditFields;
+    use HasApiTokens, HasAuditFields, HasRoles, HasUuid, Notifiable, SoftDeletes;
 
     public $incrementing = false;
 
     protected $keyType = 'string';
 
     const CREATED_AT = 'createdDate';
+
     const UPDATED_AT = 'modifiedDate';
+
     const DELETED_AT = 'deletedDate';
 
     protected $fillable = [
@@ -48,18 +49,8 @@ class User extends Authenticatable
         ];
     }
 
-    public function userCredit(): HasOne
-    {
-        return $this->hasOne(UserCredit::class, 'user_id');
-    }
-
     public function contents(): HasMany
     {
         return $this->hasMany(Content::class, 'user_id');
-    }
-
-    public function topupRequests(): HasMany
-    {
-        return $this->hasMany(TopupRequest::class, 'user_id');
     }
 }

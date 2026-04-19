@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="color-scheme" content="{{ $config->get('ui.theme', 'light') }}">
+    <meta name="theme-color" content="#dd3404">
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
+    <link rel="icon" href="/marifatun-mark.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/marifatun-mark.svg">
+
     <title>{{ $config->get('ui.title') ?? config('app.name') . ' - API Docs' }}</title>
 
     {{-- ============================================================ --}}

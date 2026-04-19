@@ -2,11 +2,10 @@
 
 namespace App\Services\V1;
 
-use App\Enums\TopupStatusEnum;
+use App\Enums\RoleEnum;
 use App\Models\Content;
-use App\Models\TopupRequest;
 use App\Models\User;
-use App\Models\UserCredit;
+use Carbon\Carbon;
 
 class DashboardService
 {
@@ -14,14 +13,6 @@ class DashboardService
     {
         $totalUsers = User::count();
         $totalContents = Content::count();
-        $totalTopupPending = TopupRequest::where('status', TopupStatusEnum::PENDING->value)->count();
-        $totalTopupApproved = TopupRequest::where('status', TopupStatusEnum::APPROVED->value)->count();
-        $totalTopupRejected = TopupRequest::where('status', TopupStatusEnum::REJECTED->value)->count();
-
-        $monthlyRevenue = (float) TopupRequest::where('status', TopupStatusEnum::APPROVED->value)
-            ->whereMonth('approved_at', now()->month)
-            ->whereYear('approved_at', now()->year)
-            ->sum('amount');
 
         $contentsByType = Content::query()
             ->selectRaw('content_type, COUNT(*) as total')
@@ -29,54 +20,87 @@ class DashboardService
             ->pluck('total', 'content_type')
             ->toArray();
 
-        $latestTopups = TopupRequest::with('user')
-            ->latest('createdDate')
-            ->limit(5)
-            ->get()
-            ->map(fn (TopupRequest $t) => [
-                'id' => $t->id,
-                'user' => $t->user?->name,
-                'amount' => (float) $t->amount,
-                'credits' => (int) $t->credits,
-                'status' => $t->status,
-                'createdDate' => optional($t->createdDate)->toIso8601String(),
-            ])
-            ->all();
+        $usersByRole = [
+            [
+                'role' => RoleEnum::ADMIN->value,
+                'total' => User::role(RoleEnum::ADMIN->value)->count(),
+            ],
+            [
+                'role' => RoleEnum::MARIFATUN_USER->value,
+                'total' => User::role(RoleEnum::MARIFATUN_USER->value)->count(),
+            ],
+        ];
+
+        $statusRows = Content::query()
+            ->selectRaw('active, COUNT(*) as total')
+            ->groupBy('active')
+            ->get();
+
+        $contentStatusBreakdown = ['active' => 0, 'inactive' => 0];
+        foreach ($statusRows as $r) {
+            $key = $r->active ? 'active' : 'inactive';
+            $contentStatusBreakdown[$key] = (int) $r->total;
+        }
+
+        $toneRows = Content::query()
+            ->selectRaw('tone, COUNT(*) as total')
+            ->groupBy('tone')
+            ->get();
+
+        $toneMerged = [];
+        foreach ($toneRows as $r) {
+            $raw = $r->tone;
+            $key = ($raw === null || trim((string) $raw) === '') ? 'unknown' : trim((string) $raw);
+            $toneMerged[$key] = ($toneMerged[$key] ?? 0) + (int) $r->total;
+        }
+        arsort($toneMerged);
+        $contentsByTone = [];
+        foreach ($toneMerged as $tone => $total) {
+            $contentsByTone[] = ['tone' => $tone, 'total' => $total];
+        }
+
+        $contentsCreatedByMonth = [];
+        $start = Carbon::now()->startOfMonth()->subMonths(5);
+        for ($i = 0; $i < 6; $i++) {
+            $monthStart = $start->copy()->addMonths($i);
+            $monthEnd = $monthStart->copy()->endOfMonth();
+            $contentsCreatedByMonth[] = [
+                'month' => $monthStart->format('Y-m'),
+                'label' => $monthStart->format('M Y'),
+                'total' => Content::query()
+                    ->whereBetween('createdDate', [$monthStart->copy()->startOfDay(), $monthEnd->copy()->endOfDay()])
+                    ->count(),
+            ];
+        }
 
         return [
             'total_users' => $totalUsers,
             'total_contents' => $totalContents,
-            'topup_summary' => [
-                'pending' => $totalTopupPending,
-                'approved' => $totalTopupApproved,
-                'rejected' => $totalTopupRejected,
-            ],
-            'monthly_revenue' => $monthlyRevenue,
             'contents_by_type' => $contentsByType,
-            'latest_topups' => $latestTopups,
+            'users_by_role' => $usersByRole,
+            'content_status_breakdown' => $contentStatusBreakdown,
+            'contents_by_tone' => $contentsByTone,
+            'contents_created_by_month' => $contentsCreatedByMonth,
         ];
     }
 
+    /**
+     * Ringkasan dashboard user: hanya konten **aktif** (`active = true`), selaras dengan list `GET /api/v1/user/contents`.
+     */
     public function userSummary(string $userId): array
     {
-        $credit = UserCredit::where('user_id', $userId)->first();
-        $totalContents = Content::where('user_id', $userId)->count();
+        $totalContents = Content::where('user_id', $userId)->where('active', true)->count();
 
-        $topupHistory = TopupRequest::where('user_id', $userId)
-            ->orderByDesc('createdDate')
-            ->limit(10)
-            ->get()
-            ->map(fn (TopupRequest $t) => [
-                'id' => $t->id,
-                'amount' => (float) $t->amount,
-                'credits' => (int) $t->credits,
-                'status' => $t->status,
-                'approved_at' => optional($t->approved_at)->toIso8601String(),
-                'createdDate' => optional($t->createdDate)->toIso8601String(),
-            ])
-            ->all();
+        $contentsByType = Content::query()
+            ->where('user_id', $userId)
+            ->where('active', true)
+            ->selectRaw('content_type, COUNT(*) as total')
+            ->groupBy('content_type')
+            ->pluck('total', 'content_type')
+            ->toArray();
 
         $recentContents = Content::where('user_id', $userId)
+            ->where('active', true)
             ->orderByDesc('createdDate')
             ->limit(5)
             ->get()
@@ -90,16 +114,9 @@ class DashboardService
             ->all();
 
         return [
-            'credits' => [
-                'balance' => $credit ? (int) $credit->credits : 0,
-                'last_daily_claim' => $credit && $credit->last_daily_claim
-                    ? $credit->last_daily_claim->toIso8601String()
-                    : null,
-                'can_claim_daily' => ! $credit || ! $credit->last_daily_claim || ! $credit->last_daily_claim->isSameDay(now()),
-            ],
             'total_contents' => $totalContents,
+            'contents_by_type' => $contentsByType,
             'recent_contents' => $recentContents,
-            'topup_history' => $topupHistory,
         ];
     }
 }

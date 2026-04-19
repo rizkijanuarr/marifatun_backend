@@ -12,7 +12,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->uuid('user_id')->index();
             $table->string('content_type');
-            $table->string('topic');
+            $table->text('topic');
             $table->text('keywords')->nullable();
             $table->string('target_audience')->nullable();
             $table->string('tone');

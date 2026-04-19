@@ -4,7 +4,6 @@ namespace App\Services\V1;
 
 use App\Enums\RoleEnum;
 use App\Models\User;
-use App\Models\UserCredit;
 use App\Repositories\V1\AuthRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -25,13 +24,6 @@ class AuthService
             ]);
 
             $user->assignRole(RoleEnum::MARIFATUN_USER->value);
-
-            UserCredit::create([
-                'user_id' => $user->id,
-                'credits' => 1,
-                'last_daily_claim' => now(),
-                'active' => true,
-            ]);
 
             $token = $user->createToken('auth-token')->plainTextToken;
 

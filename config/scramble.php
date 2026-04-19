@@ -28,51 +28,9 @@ return [
 
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
+         * Dikosongkan — daftar endpoint dikelompokkan per tag (Auth, ROLE ADMIN, ROLE MARIFATUN_USER).
          */
-        'description' => <<<'MD'
-## Overview
-
-Marifatun API adalah layanan backend untuk platform copywriting berbasis LLM.
-Satu brief, lima format siap posting: **LinkedIn**, **X (Twitter)**, **Threads**,
-**Facebook**, dan **Email Marketing**. API ini menyediakan otentikasi, manajemen
-user, saldo kredit, top-up via QRIS, dan generator konten otomatis.
-
-## Description
-
-Platform dirancang untuk UMKM, digital marketer, dan content creator yang butuh
-membuat konten multi-channel secara konsisten tanpa harus menulis dari nol. Tiap
-generate konten mengonsumsi 1 kredit; revisi konten tidak memotong kredit dan
-dibatasi 3x per konten. Kredit dapat ditambah melalui permintaan top-up yang
-disetujui admin.
-
-## Role
-
-- `ADMIN` — akses penuh: manajemen user, kredit, seluruh konten, approval
-  top-up, dan dashboard admin.
-- `MARIFATUN_USER` — user aplikasi: generate & revisi konten sendiri, melihat
-  saldo kredit sendiri, mengajukan top-up, dan dashboard user.
-
-## Core Bisnis
-
-1. **Auth** — registrasi, login, logout, dan reset password (Sanctum Bearer token).
-2. **User Credit** — setiap user punya saldo kredit; kredit dipotong saat generate
-   konten baru, tidak dipotong untuk revisi.
-3. **Content** — generator copywriting lintas platform berbasis LLM. Revisi
-   maksimum 3x per konten.
-4. **Topup Request** — user mengajukan top-up (default via QRIS), admin melakukan
-   approval; saldo bertambah otomatis begitu disetujui.
-5. **Dashboard** — ringkasan metrik untuk admin (agregat global) dan user
-   (saldo, history top-up, konten terbaru).
-
-## API Base URL
-
-```
-{APP_URL}/api/v1
-```
-
-Contoh: `http://127.0.0.1:8000/api/v1`. Semua endpoint versi pertama
-berada di bawah prefix `/api/v1`.
-MD,
+        'description' => '',
     ],
 
     /*
@@ -97,7 +55,7 @@ MD,
         /*
          * Hide the schemas in the Table of Contents. Enabled by default.
          */
-        'hide_schemas' => false,
+        'hide_schemas' => true,
 
         /*
          * URL to an image that displays as a small square logo next to the title, above the table of contents.

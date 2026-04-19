@@ -7,8 +7,15 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class UserListResponse extends ListResponse
 {
-    public static function fromPaginator(LengthAwarePaginator $paginator, string $message = 'Success'): self
-    {
+    /**
+     * @param  array<string, mixed>  $statistics
+     */
+    public static function fromPaginator(
+        LengthAwarePaginator $paginator,
+        string $message = 'Success',
+        int $totalUsersInTable = 0,
+        array $statistics = [],
+    ): self {
         $items = collect($paginator->items())->map(fn ($u) => UserResponse::transform($u))->all();
 
         return new self(
@@ -16,6 +23,8 @@ class UserListResponse extends ListResponse
             message: $message,
             status: 200,
             meta: [
+                'total_users' => $totalUsersInTable,
+                'statistics' => $statistics,
                 'pagination' => [
                     'current_page' => $paginator->currentPage(),
                     'per_page' => $paginator->perPage(),

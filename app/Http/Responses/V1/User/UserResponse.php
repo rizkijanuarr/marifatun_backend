@@ -22,7 +22,7 @@ class UserResponse extends BaseResponse
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'active' => (bool) $user->active,
+            'active' => $user->active ? 1 : 0,
             'roles' => $user->getRoleNames(),
             'createdDate' => optional($user->createdDate)->toIso8601String(),
             'modifiedDate' => optional($user->modifiedDate)->toIso8601String(),

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Content extends Model
 {
-    use HasUuid, HasAuditFields, SoftDeletes;
+    use HasAuditFields, HasUuid, SoftDeletes;
 
     protected $table = 'contents';
 
@@ -19,10 +19,10 @@ class Content extends Model
     protected $keyType = 'string';
 
     const CREATED_AT = 'createdDate';
-    const UPDATED_AT = 'modifiedDate';
-    const DELETED_AT = 'deletedDate';
 
-    public const MAX_REVISIONS = 3;
+    const UPDATED_AT = 'modifiedDate';
+
+    const DELETED_AT = 'deletedDate';
 
     protected $fillable = [
         'user_id',
@@ -31,8 +31,10 @@ class Content extends Model
         'keywords',
         'target_audience',
         'tone',
+        'video_platform',
+        'video_key_message',
+        'video_cta',
         'result',
-        'revision_count',
         'active',
     ];
 
@@ -40,7 +42,6 @@ class Content extends Model
     {
         return [
             'active' => 'boolean',
-            'revision_count' => 'integer',
             'createdDate' => 'datetime',
             'modifiedDate' => 'datetime',
             'deletedDate' => 'datetime',

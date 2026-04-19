@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Enums\RoleEnum;
 use App\Models\User;
-use App\Models\UserCredit;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -25,15 +24,5 @@ class UserSeeder extends Seeder
         if (! $user->hasRole(RoleEnum::MARIFATUN_USER->value)) {
             $user->assignRole(RoleEnum::MARIFATUN_USER->value);
         }
-
-        UserCredit::firstOrCreate(
-            ['user_id' => $user->id],
-            [
-                'credits' => 1,
-                'last_daily_claim' => now(),
-                'active' => true,
-                'createdBy' => 'system',
-            ]
-        );
     }
 }
