@@ -18,10 +18,12 @@ Pastikan di komputer lokal sudah terpasang:
 Langkah menjalankan project:
 
 ```bash
-cd marifatun-backend
+cd marifatun_backend
 composer install
+cp .env.example .env
 php artisan key:generate
 php artisan storage:link
+php artisan migrate (Pastikan username, password, nama database sudah terbuat di database mysql lokal pc/laptop masing-masing)
 php artisan db:seed
 php artisan serv
 ```
